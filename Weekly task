@@ -1,0 +1,458 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Calendar as CalendarIcon, 
+  Check, 
+  ChevronLeft, 
+  ChevronRight, 
+  Layout, 
+  Plus, 
+  Trash2, 
+  X,
+  BookOpen,
+  Atom,
+  Pi,
+  Calculator
+} from 'lucide-react';
+
+// --- Utility Functions ---
+
+const formatDateKey = (date) => {
+  return date.toISOString().split('T')[0];
+};
+
+const getStartOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is sunday
+  return new Date(d.setDate(diff));
+};
+
+const generateWeekDays = (startDate) => {
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    days.push(d);
+  }
+  return days;
+};
+
+const getMonthDays = (year, month) => {
+  const date = new Date(year, month, 1);
+  const days = [];
+  while (date.getMonth() === month) {
+    days.push(new Date(date));
+    date.setDate(date.getDate() + 1);
+  }
+  return days;
+};
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// --- Components ---
+
+// 1. Decorative Background
+const AcademicBackground = () => (
+  <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-5">
+    <div className="absolute top-10 left-10 transform -rotate-12"><Pi size={120} /></div>
+    <div className="absolute top-1/4 right-20 transform rotate-45"><Atom size={140} /></div>
+    <div className="absolute bottom-20 left-1/3 transform rotate-12"><BookOpen size={100} /></div>
+    <div className="absolute bottom-10 right-10 transform -rotate-12"><Calculator size={110} /></div>
+    {/* Geometric patterns */}
+    <div className="absolute top-1/2 left-10 w-32 h-32 border-4 border-current rounded-full opacity-50"></div>
+    <div className="absolute top-20 right-1/3 w-20 h-20 border-4 border-current rotate-45 opacity-50"></div>
+  </div>
+);
+
+// 2. Task Modal
+const TaskModal = ({ isOpen, onClose, date, taskIndex, tasksData, onSave, columnTitle }) => {
+  const [text, setText] = useState("");
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && date) {
+      const dateKey = formatDateKey(date);
+      const dayTasks = tasksData[dateKey] || {};
+      const specificTask = dayTasks[taskIndex] || { text: "", completed: false };
+      setText(specificTask.text);
+      setIsCompleted(specificTask.completed);
+    }
+  }, [isOpen, date, taskIndex, tasksData]);
+
+  if (!isOpen) return null;
+
+  const handleSave = () => {
+    onSave(formatDateKey(date), taskIndex, { text, completed: isCompleted });
+    onClose();
+  };
+
+  const handleDelete = () => {
+    onSave(formatDateKey(date), taskIndex, { text: "", completed: false });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-[#FDFBF7] rounded-xl shadow-2xl w-full max-w-md border-t-8 border-[#722F37] animate-in fade-in zoom-in duration-200">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-2xl font-serif font-bold text-[#722F37]">
+                {date.toLocaleDateString('en-US', { weekday: 'long' })}
+              </h2>
+              <p className="text-[#9D5C63]">{date.toLocaleDateString()} • {columnTitle}</p>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-[#722F37] transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1">Task Description</label>
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="What needs to be done?"
+                className="w-full p-4 rounded-lg border border-[#E5D4D6] focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37] outline-none bg-white min-h-[120px] resize-none text-gray-800"
+                autoFocus
+              />
+            </div>
+
+            <div 
+              className="flex items-center space-x-3 p-3 rounded-lg border border-[#E5D4D6] cursor-pointer hover:bg-red-50 transition-colors"
+              onClick={() => setIsCompleted(!isCompleted)}
+            >
+              <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${isCompleted ? 'bg-[#722F37] border-[#722F37]' : 'border-gray-300 bg-white'}`}>
+                {isCompleted && <Check size={16} className="text-white" />}
+              </div>
+              <span className={`font-medium ${isCompleted ? 'text-[#722F37]' : 'text-gray-600'}`}>
+                Mark as Completed
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-8">
+            <button 
+              onClick={handleDelete}
+              className="flex-1 py-3 px-4 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <Trash2 size={18} /> Clear
+            </button>
+            <button 
+              onClick={handleSave}
+              className="flex-1 py-3 px-4 rounded-lg bg-[#722F37] text-white hover:bg-[#5B252C] font-medium shadow-lg hover:shadow-xl transition-all"
+            >
+              Save Routine
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 3. Main Application
+export default function App() {
+  // State
+  const [currentView, setCurrentView] = useState('routine'); // 'routine' or 'calendar'
+  const [currentDate, setCurrentDate] = useState(new Date()); // For navigation
+  const [columnCount, setColumnCount] = useState(3);
+  
+  // Data: { "YYYY-MM-DD": { "0": { text, completed }, "1": ... } }
+  const [tasksData, setTasksData] = useState(() => {
+    const saved = localStorage.getItem('wineRoutineData');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [modalState, setModalState] = useState({ isOpen: false, date: null, taskIndex: 0 });
+
+  // Persistence
+  useEffect(() => {
+    localStorage.setItem('wineRoutineData', JSON.stringify(tasksData));
+  }, [tasksData]);
+
+  // Handlers
+  const handleSaveTask = (dateKey, index, taskObj) => {
+    setTasksData(prev => ({
+      ...prev,
+      [dateKey]: {
+        ...(prev[dateKey] || {}),
+        [index]: taskObj
+      }
+    }));
+  };
+
+  const addColumn = () => setColumnCount(prev => prev + 1);
+
+  const openModal = (date, index) => {
+    setModalState({ isOpen: true, date, taskIndex: index });
+  };
+
+  // --- Views ---
+
+  const WeeklyView = () => {
+    const startOfWeek = getStartOfWeek(currentDate);
+    const weekDays = generateWeekDays(startOfWeek);
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-[#E5D4D6]">
+          <div className="flex items-center gap-4">
+             <button 
+                onClick={() => {
+                  const d = new Date(currentDate);
+                  d.setDate(d.getDate() - 7);
+                  setCurrentDate(d);
+                }}
+                className="p-2 hover:bg-red-50 rounded-full text-[#722F37]"
+             >
+               <ChevronLeft />
+             </button>
+             <h2 className="text-xl font-serif font-bold text-[#722F37]">
+               Week of {startOfWeek.toLocaleDateString()}
+             </h2>
+             <button 
+                onClick={() => {
+                  const d = new Date(currentDate);
+                  d.setDate(d.getDate() + 7);
+                  setCurrentDate(d);
+                }}
+                className="p-2 hover:bg-red-50 rounded-full text-[#722F37]"
+             >
+               <ChevronRight />
+             </button>
+          </div>
+          <button 
+            onClick={() => setCurrentDate(new Date())}
+            className="text-sm font-medium text-[#722F37] hover:underline"
+          >
+            Jump to Today
+          </button>
+        </div>
+
+        <div className="overflow-x-auto pb-6">
+          <table className="w-full min-w-[800px] border-collapse bg-white rounded-xl shadow-lg overflow-hidden">
+            <thead>
+              <tr className="bg-[#722F37] text-white">
+                <th className="p-4 text-left font-serif font-medium w-48 border-r border-[#8B3A44]">Day of Week</th>
+                {Array.from({ length: columnCount }).map((_, i) => (
+                  <th key={i} className="p-4 text-center font-serif font-medium min-w-[160px] border-r border-[#8B3A44]">
+                    Task {i + 1}
+                  </th>
+                ))}
+                <th className="p-4 text-center w-16 bg-[#5B252C] cursor-pointer hover:bg-[#4A1E24] transition-colors" onClick={addColumn}>
+                  <div className="flex justify-center items-center h-full w-full" title="Add New Task Column">
+                    <Plus size={20} />
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {weekDays.map((day, rowIndex) => {
+                const dateKey = formatDateKey(day);
+                const isToday = formatDateKey(new Date()) === dateKey;
+                
+                return (
+                  <tr key={dateKey} className={`${rowIndex % 2 === 0 ? 'bg-white' : 'bg-[#FAF6F6]'} hover:bg-[#FDF2F4] transition-colors`}>
+                    <td className={`p-4 border-r border-gray-100 ${isToday ? 'bg-red-50' : ''}`}>
+                      <div className={`font-bold ${isToday ? 'text-[#722F37]' : 'text-gray-700'}`}>
+                        {WEEKDAY_NAMES[day.getDay()]}
+                      </div>
+                      <div className="text-xs text-gray-400">{day.toLocaleDateString()}</div>
+                    </td>
+                    
+                    {Array.from({ length: columnCount }).map((_, colIndex) => {
+                      const task = tasksData[dateKey]?.[colIndex];
+                      return (
+                        <td 
+                          key={colIndex} 
+                          className="p-2 border-r border-gray-100 cursor-pointer relative group"
+                          onClick={() => openModal(day, colIndex)}
+                        >
+                          <div className={`h-24 w-full rounded-lg p-3 border border-transparent transition-all duration-200 
+                            ${task?.completed 
+                              ? 'bg-[#E8F5E9] border-green-200 shadow-inner' 
+                              : task?.text 
+                                ? 'bg-white border-gray-200 shadow-sm group-hover:shadow-md group-hover:border-[#722F37]' 
+                                : 'bg-transparent group-hover:bg-white group-hover:shadow-sm'
+                            }
+                          `}>
+                            {task?.text ? (
+                              <div className="flex flex-col h-full justify-between">
+                                <span className={`text-sm line-clamp-3 ${task.completed ? 'text-gray-400 line-through decoration-gray-400' : 'text-gray-800'}`}>
+                                  {task.text}
+                                </span>
+                                {task.completed && (
+                                  <div className="self-end text-green-600 bg-green-100 rounded-full p-1">
+                                    <Check size={12} />
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-40 transition-opacity">
+                                <Plus className="text-[#722F37]" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td className="bg-gray-50/50"></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const CalendarView = () => {
+    const daysInMonth = getMonthDays(currentDate.getFullYear(), currentDate.getMonth());
+    const startDay = daysInMonth[0].getDay(); // 0 is Sunday
+    
+    // Adjust for Monday start if desired, but standard calendar starts Sunday usually. 
+    // Let's stick to standard grid.
+    const emptySlots = Array(startDay).fill(null);
+
+    return (
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex justify-between items-center mb-8">
+           <div className="flex items-center gap-6">
+             <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="p-2 hover:bg-white hover:shadow-md rounded-full transition-all text-[#722F37]">
+               <ChevronLeft size={28} />
+             </button>
+             <h2 className="text-3xl font-serif font-bold text-[#722F37]">
+               {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+             </h2>
+             <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="p-2 hover:bg-white hover:shadow-md rounded-full transition-all text-[#722F37]">
+               <ChevronRight size={28} />
+             </button>
+           </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-4">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+            <div key={d} className="text-center font-bold text-[#9D5C63] uppercase tracking-wider text-sm py-2">
+              {d}
+            </div>
+          ))}
+          
+          {emptySlots.map((_, i) => <div key={`empty-${i}`} className="h-32"></div>)}
+
+          {daysInMonth.map(day => {
+            const dateKey = formatDateKey(day);
+            const dayTasks = tasksData[dateKey] || {};
+            const taskCount = Object.keys(dayTasks).length;
+            const completedCount = Object.values(dayTasks).filter(t => t.completed).length;
+            const isToday = formatDateKey(new Date()) === dateKey;
+
+            return (
+              <div 
+                key={dateKey}
+                onClick={() => openModal(day, 0)} // Opens first task by default in calendar, user can switch columns if logic expanded, but keeping simple for now
+                className={`h-32 rounded-xl p-3 border transition-all cursor-pointer relative group overflow-hidden
+                  ${isToday ? 'bg-white border-[#722F37] ring-1 ring-[#722F37]' : 'bg-white/60 border-transparent hover:bg-white hover:shadow-lg hover:-translate-y-1'}
+                `}
+              >
+                 <div className="flex justify-between items-start mb-2">
+                    <span className={`font-bold text-lg ${isToday ? 'text-[#722F37]' : 'text-gray-600'}`}>
+                      {day.getDate()}
+                    </span>
+                    {taskCount > 0 && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#FAF0F1] text-[#722F37]">
+                        {completedCount}/{taskCount} Done
+                      </span>
+                    )}
+                 </div>
+
+                 <div className="space-y-1">
+                    {Object.values(dayTasks).slice(0, 3).map((task, i) => (
+                      task.text && (
+                        <div key={i} className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <div className={`w-1.5 h-1.5 rounded-full ${task.completed ? 'bg-green-400' : 'bg-[#D4AF37]'}`}></div>
+                          <span className={`truncate ${task.completed ? 'line-through opacity-50' : ''}`}>
+                            {task.text}
+                          </span>
+                        </div>
+                      )
+                    ))}
+                    {taskCount > 3 && (
+                      <div className="text-xs text-gray-400 pl-3">+{taskCount - 3} more</div>
+                    )}
+                 </div>
+                 
+                 {/* Visual indicator for adding */}
+                 <div className="absolute inset-0 flex items-center justify-center bg-[#722F37]/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[#722F37] font-medium text-sm">Edit Day</span>
+                 </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FDFBF7] text-gray-800 font-sans selection:bg-[#722F37] selection:text-white">
+      <AcademicBackground />
+      
+      {/* Top Navigation */}
+      <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[#E5D4D6] px-6 py-4 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-[#722F37] text-white p-2 rounded-lg">
+              <Layout size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-serif font-bold text-[#722F37] tracking-tight">Academic Routine</h1>
+              <p className="text-xs text-[#9D5C63]">Plan. Achieve. Repeat.</p>
+            </div>
+          </div>
+
+          <div className="flex bg-[#F5EBEB] p-1 rounded-lg">
+            <button
+              onClick={() => setCurrentView('routine')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                currentView === 'routine' 
+                ? 'bg-white text-[#722F37] shadow-sm' 
+                : 'text-gray-500 hover:text-[#722F37]'
+              }`}
+            >
+              <Layout size={16} /> Weekly Routine
+            </button>
+            <button
+              onClick={() => setCurrentView('calendar')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                currentView === 'calendar' 
+                ? 'bg-white text-[#722F37] shadow-sm' 
+                : 'text-gray-500 hover:text-[#722F37]'
+              }`}
+            >
+              <CalendarIcon size={16} /> Calendar
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="relative max-w-7xl mx-auto px-6 py-8 z-10">
+        {currentView === 'routine' ? <WeeklyView /> : <CalendarView />}
+      </main>
+
+      {/* Modals */}
+      <TaskModal 
+        isOpen={modalState.isOpen}
+        date={modalState.date}
+        taskIndex={modalState.taskIndex}
+        tasksData={tasksData}
+        onSave={handleSaveTask}
+        onClose={() => setModalState({ ...modalState, isOpen: false })}
+        columnTitle={currentView === 'routine' ? `Task ${modalState.taskIndex + 1}` : 'Tasks'}
+      />
+    </div>
+  );
+}
